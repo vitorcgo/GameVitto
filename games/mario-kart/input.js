@@ -32,7 +32,11 @@ function shapeSteer(bankDeg) {
   const amount = Math.abs(bankDeg);
   if (amount <= STEER_DEADZONE) return 0;
   const sign = bankDeg < 0 ? -1 : 1;
-  return sign * (amount - STEER_DEADZONE) * (STEER_FULL / (STEER_FULL - STEER_DEADZONE));
+  // Keep the stable neutral zone, but bring useful steering in earlier. The
+  // previous linear curve required a large phone tilt before tight corners
+  // became practical, while preserving the same 18-degree full-lock point.
+  const normalized = Math.min(1, (amount - STEER_DEADZONE) / (STEER_FULL - STEER_DEADZONE));
+  return sign * Math.pow(normalized, 0.82) * STEER_FULL;
 }
 
 class SteerFilter {

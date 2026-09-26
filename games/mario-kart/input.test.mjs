@@ -42,6 +42,13 @@ test("both landscape grips honor the device-pinned east-end-down sign", () => {
     assert.ok(w.read(840).steer < -0.4);
   }
 });
+test("moderate phone tilt reaches useful steering without changing full lock", () => {
+  const w = settled();
+  w.sample(sample(8), 816);
+  assert.ok(w.read(820).steer > 0.4);
+  w.sample(sample(18), 832);
+  assert.ok(Math.abs(w.read(840).steer - 1) < 1e-8);
+});
 test("one tilted/moving countdown sample never becomes a permanent wrong neutral", () => {
   const w = new WheelInput();
   for (let t = 0; t < 1500; t += 16)

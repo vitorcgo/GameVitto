@@ -1,9 +1,9 @@
 export class RenderBudget {
-  constructor({ windowSize = 90, slowFrameMs = 20, fastFrameMs = 14.5 } = {}) {
+  constructor({ windowSize = 90, slowFrameMs = 20, fastFrameMs = 14.5, initialQuality = 'performance' } = {}) {
     this.windowSize = windowSize;
     this.slowFrameMs = slowFrameMs;
     this.fastFrameMs = fastFrameMs;
-    this.quality = 'balanced';
+    this.quality = initialQuality === 'balanced' ? 'balanced' : 'performance';
     this.total = 0;
     this.count = 0;
     this.fastWindows = 0;

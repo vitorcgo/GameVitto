@@ -168,7 +168,7 @@ outputPass.material.fragmentShader = outputPass.material.fragmentShader.replace(
   "gl_FragColor = vec4(texture2D( tDiffuse, vUv ).rgb, 1.0);",
 );
 composer.addPass(outputPass);
-const renderBudget = new RenderBudget();
+const renderBudget = new RenderBudget({ windowSize: 60 });
 let renderQuality = 'balanced';
 function applyRenderQuality(quality) {
   if (quality === renderQuality && renderer.getPixelRatio() === Math.min(devicePixelRatio, 1)) return;
@@ -181,6 +181,9 @@ function applyRenderQuality(quality) {
   ambientOcclusion.enabled = quality === 'balanced';
   bloom.enabled = quality === 'balanced';
 }
+// Start with the inexpensive path. Full effects return automatically only
+// after three sustained windows comfortably inside the 60 FPS budget.
+applyRenderQuality('performance');
 const coursePreference = new URLSearchParams(location.search).get('sourceCourse');
 let courseDescriptor = null;
 if (coursePreference !== '0') {
@@ -906,6 +909,7 @@ function draw(dt, now) {
   for (const [i, r] of race.racers.entries()) {
     const k = karts[i],
       path = activeSurfaceTrack ? surfaceAt(r.s,r.lateral) : trackAt(r.s);
+    let visualFrame = null;
     const cast = i === 0 || Math.hypot(r.x - p.x, r.z - p.z) < 18;
     if (k.cast !== cast) {
       k.model.traverse((o) => {
@@ -920,10 +924,10 @@ function draw(dt, now) {
       k.root.position.set(r.x+n.x*(hop+.1),r.y+n.y*(hop+.1),r.z+n.z*(hop+.1));
     }
     if (!r.gliding) {
-      const frame = roadFrame(r.s, r.lateral, r.heading, r.surfaceForward, r.surfaceNormal);
-      basisX.set(frame.right.x, frame.right.y, frame.right.z);
-      basisY.set(frame.up.x, frame.up.y, frame.up.z);
-      basisZ.set(-frame.forward.x, -frame.forward.y, -frame.forward.z);
+      visualFrame = roadFrame(r.s, r.lateral, r.heading, r.surfaceForward, r.surfaceNormal);
+      basisX.set(visualFrame.right.x, visualFrame.right.y, visualFrame.right.z);
+      basisY.set(visualFrame.up.x, visualFrame.up.y, visualFrame.up.z);
+      basisZ.set(-visualFrame.forward.x, -visualFrame.forward.y, -visualFrame.forward.z);
       basis.makeBasis(basisX, basisY, basisZ);
       k.root.quaternion.setFromRotationMatrix(basis);
     } else {
@@ -982,15 +986,15 @@ function draw(dt, now) {
       k.shadow.quaternion.copy(k.root.quaternion);
       k.shadow.rotateX(-Math.PI / 2);
     } else k.shadow.rotation.set(-Math.PI / 2, 0, r.heading);
-    effects.tire(r,roadFrame(r.s,r.lateral,r.heading,r.surfaceForward,r.surfaceNormal),paused?0:dt);
+    effects.tire(r,visualFrame,paused?0:dt);
   }
   effects.update(paused?0:dt,innerHeight);
   for (const [i, m] of coinMeshes.entries()) {
-    m.visible = race.coins[i].respawn === 0 && m.getWorldPosition(basisX).distanceTo(camera.position) > 1.6;
+    m.visible = race.coins[i].respawn === 0 && m.position.distanceToSquared(camera.position) > 2.56;
     m.rotation.z = now * 0.003;
   }
   for (const [i, g] of boxMeshes.entries()) {
-    g.visible = race.boxes[i].respawn === 0 && g.getWorldPosition(basisX).distanceTo(camera.position) > 1.2;
+    g.visible = race.boxes[i].respawn === 0 && g.position.distanceToSquared(camera.position) > 1.44;
     g.rotation.y = now * 0.001;
     g.rotation.z = Math.sin(now * 0.001 + i) * 0.2;
   }

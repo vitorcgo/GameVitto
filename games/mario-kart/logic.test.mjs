@@ -88,6 +88,18 @@ test("zero steering is a straight world-space line; no uncommanded yaw", () => {
   assert.ok(Math.abs(angle(r.heading - h)) < 1e-10);
   assert.ok(Math.hypot(r.x - x, r.z - z) > 20);
 });
+test("full steering stays effective at racing speed and drifting tightens the corner", () => {
+  const normal = solo(50), drifting = solo(50);
+  for (const race of [normal, drifting]) race.player.speed = 36;
+  const startNormal = normal.player.heading;
+  const startDrift = drifting.player.heading;
+  step(normal, 0.3, { gas: true, steer: 1 });
+  step(drifting, 0.3, { gas: true, steer: 1, drift: true });
+  const normalTurn = Math.abs(angle(normal.player.heading - startNormal));
+  const driftTurn = Math.abs(angle(drifting.player.heading - startDrift));
+  assert.ok(normalTurn > 0.42, `curva normal insuficiente: ${normalTurn}`);
+  assert.ok(driftTurn > normalTurn * 1.15, `${driftTurn} não fechou mais que ${normalTurn}`);
+});
 test("acceleration, coasting, brake and controlled reverse have distinct effects", () => {
   const race = solo(),
     r = race.player;

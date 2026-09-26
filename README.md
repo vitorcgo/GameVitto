@@ -6,6 +6,24 @@ GameVitto é uma central de jogos criada por [VitorCGO](https://github.com/vitor
 
 O primeiro jogo disponível é o **Mario Kart**, com oito pilotos, adversários controlados pelo jogo, itens, derrapagem, antigravidade e planador.
 
+## Capturas de tela
+
+### Central de jogos
+
+![Tela inicial do GameVitto](docs/screenshots/gamevitto-inicio.png)
+
+### Preparação da pista
+
+![Tela de carregamento do Mario Kart](docs/screenshots/mario-kart-carregamento.png)
+
+### Escolha de piloto
+
+![Seleção de piloto e duração da corrida](docs/screenshots/mario-kart-selecao.png)
+
+### Corrida
+
+![Corrida no Estádio Mario Kart](docs/screenshots/mario-kart-corrida.png)
+
 ## Como iniciar
 
 Requisitos: Node.js 22 ou mais recente e OpenSSL disponível no sistema.
@@ -52,4 +70,4 @@ O código do projeto está sob a licença MIT. Mario Kart e seus personagens sã
 
 Algumas artes promocionais de itens pertencentes à Nintendo estão incluídas e não fazem parte da licença MIT. As origens estão registradas em [Fontes das artes dos itens](games/mario-kart/item-art/SOURCES.md). A textura original do gramado tem sua procedência descrita em [Textura original do gramado](games/mario-kart/art/README.md). Ferramentas para recursos locais opcionais são documentadas em [Conversões locais opcionais](games/mario-kart/pipeline/SOURCE-ASSETS.md).
 
-A marca do GameVitto e a arte de kart usadas na central foram geradas originalmente para este projeto com a ferramenta integrada de geração de imagens, sem imagens de referência protegidas, personagens, marcas ou logotipos de terceiros.
+A marca do GameVitto foi gerada originalmente para este projeto com a ferramenta integrada de geração de imagens, sem imagens de referência protegidas, personagens, marcas ou logotipos de terceiros.

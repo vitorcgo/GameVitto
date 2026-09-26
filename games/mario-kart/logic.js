@@ -370,10 +370,14 @@ export class Race {
       r.speed = Math.sign(r.speed) * Math.max(0, Math.abs(r.speed) - 5.5 * dt);
     }
     if (r.speed > max) r.speed = Math.max(max, r.speed - 36 * dt);
-    // No sensor angular integration, yaw momentum or centrifugal term: zero wheel
-    // means exactly straight in world space. Turn rate is bounded at every speed.
-    const turn = (r.drift ? r.drift * 0.12 + r.steer * 0.92 : r.steer) * 1.48;
-    const turnAngle = turn * clamp(r.speed / 20, -0.5, 1) * dt * (r.gliding ? 0.52 : 1);
+    // Zero wheel remains exactly straight, but high speed no longer creates an
+    // excessive turning radius. Drifting now tightens a committed corner while
+    // still allowing counter-steer instead of acting as a mostly visual state.
+    const steering = r.drift ? r.drift * 0.28 + r.steer * 0.96 : r.steer;
+    const speedSteer = r.speed < 0
+      ? clamp(r.speed / 16, -0.55, 0)
+      : clamp(r.speed / 18, 0, 1.08);
+    const turnAngle = steering * 1.62 * speedSteer * dt * (r.gliding ? 0.52 : 1);
     const previousS = r.s,
       previousProgress = r.progress;
     if(activeSurfaceTrack?.hasRoadMesh){const launch=sourceJumpLaunch(r,dt);if(launch){r.jump=launch;r.drift=0;r.charge=0;this.emit('rampJump',r);}}

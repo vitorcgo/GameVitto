@@ -8,9 +8,10 @@ function feed(budget, frameMs, frames) {
   return change;
 }
 
-test('ativa o modo de desempenho quando os quadros ficam acima do orçamento', () => {
+test('começa no modo de desempenho e permanece nele com quadros lentos', () => {
   const budget = new RenderBudget({ windowSize: 10 });
-  assert.equal(feed(budget, 45, 10), 'performance');
+  assert.equal(budget.quality, 'performance');
+  assert.equal(feed(budget, 45, 10), null);
   assert.equal(budget.quality, 'performance');
 });
 
@@ -18,7 +19,7 @@ test('não reage a pausas da aba ou medições inválidas', () => {
   const budget = new RenderBudget({ windowSize: 3 });
   for (const value of [NaN, Infinity, 0, 400]) assert.equal(budget.sample(value), null);
   assert.equal(budget.count, 0);
-  assert.equal(budget.quality, 'balanced');
+  assert.equal(budget.quality, 'performance');
 });
 
 test('só restaura a qualidade após três janelas com folga real de desempenho', () => {

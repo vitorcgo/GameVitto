@@ -4,6 +4,7 @@ import * as T from 'three';
 export function raceEffects(scene,random=Math.random){
  const tireState=new WeakMap();
  const count=1200,particles=Array.from({length:count},()=>({life:0}));let cursor=0;
+ const activeParticles=new Set();
  const positions=new Float32Array(count*3),colors=new Float32Array(count*3),sizes=new Float32Array(count),alphas=new Float32Array(count),kinds=new Float32Array(count),velocities=new Float32Array(count*3);
  const geometry=new T.BufferGeometry();
  for(const [name,array,size] of [['position',positions,3],['color',colors,3],['size',sizes,1],['alpha',alphas,1],['kind',kinds,1],['velocity',velocities,3]])geometry.setAttribute(name,new T.BufferAttribute(array,size));
@@ -22,6 +23,7 @@ export function raceEffects(scene,random=Math.random){
    }`});
  const points=new T.Points(geometry,material);points.frustumCulled=false;points.name='tire-arcs-glints-and-smoke';scene.add(points);
  const shards=Array.from({length:192},()=>({life:0}));let shardCursor=0;
+ const activeShards=new Set();
  // A shallow faceted quadrilateral, not repeated flat triangles. Unequal
  // per-axis instance scales and tumbling expose different silhouettes.
  const corners=[[-.55,-.4,0],[.5,-.28,0],[.31,.6,0],[-.4,.29,0]],verts=[],bary=[];
@@ -39,7 +41,7 @@ export function raceEffects(scene,random=Math.random){
  // Allocate instanceColor before the first shader compile.
  for(let i=0;i<shards.length;i++){glass.setColorAt(i,tint.set('#ffffff'));dummy.scale.setScalar(0);dummy.updateMatrix();glass.setMatrixAt(i,dummy.matrix);}
  function emit(position,velocity,color,size,life,kind=0,normal={x:0,y:1,z:0}){
-  Object.assign(particles[cursor],{...position,velocity:{...velocity},normal:{...normal},life,total:life,size,kind,color});cursor=(cursor+1)%count;
+  const index=cursor;Object.assign(particles[index],{...position,velocity:{...velocity},normal:{...normal},life,total:life,size,kind,color});activeParticles.add(index);cursor=(cursor+1)%count;
  }
  function box(box){
   const n=box.normal||{x:0,y:1,z:0},origin={x:box.x+n.x*1.8,y:box.y+n.y*1.8,z:box.z+n.z*1.8};
@@ -47,7 +49,7 @@ export function raceEffects(scene,random=Math.random){
    const v=new T.Vector3(random()-.5,random()-.25,random()-.5).normalize().multiplyScalar(3+random()*5);
    const p={x:origin.x+v.x*.025,y:origin.y+v.y*.025,z:origin.z+v.z*.025},life=.4+random()*.27;
    Object.assign(shards[shardCursor],{...p,v,normal:n,life,total:life,rotation:new T.Vector3(random()*6,random()*6,random()*6),spin:new T.Vector3(random()*15-7.5,random()*15-7.5,random()*15-7.5),size:i<8?.42+random()*.32:.18+random()*.26,aspect:.6+random()*.9});
-   glass.setColorAt(shardCursor,tint.set(palette[i%palette.length]));shardCursor=(shardCursor+1)%shards.length;
+   glass.setColorAt(shardCursor,tint.set(palette[i%palette.length]));activeShards.add(shardCursor);shardCursor=(shardCursor+1)%shards.length;
    if(i<14)emit(p,v.clone().multiplyScalar(.85),palette[i%palette.length],.35+random()*.4,.24+random()*.2,2,n);
   }
   emit(origin,{x:0,y:0,z:0},'#edffff',3.1,.12,3,n);
@@ -74,21 +76,24 @@ export function raceEffects(scene,random=Math.random){
  }
  function update(dt,height){
   dt=Number.isFinite(dt)?Math.max(0,dt):0;material.uniforms.viewport.value=height;
-  particles.forEach((p,i)=>{
-   p.life=Math.max(0,p.life-dt);if(p.life<=0){alphas[i]=0;sizes[i]=0;return;}
+  let particlesChanged=false;
+  for(const i of activeParticles){const p=particles[i];particlesChanged=true;
+   p.life=Math.max(0,p.life-dt);if(p.life<=0){alphas[i]=0;sizes[i]=0;activeParticles.delete(i);continue;}
    const age=1-p.life/p.total;
    for(const axis of ['x','y','z']){p[axis]+=p.velocity[axis]*dt;if(p.kind===0)p.velocity[axis]-=p.normal[axis]*12*dt;}
-   positions.set([p.x,p.y,p.z],i*3);velocities.set([p.velocity.x,p.velocity.y,p.velocity.z],i*3);tint.set(p.color);colors.set([tint.r,tint.g,tint.b],i*3);
+   const offset=i*3;positions[offset]=p.x;positions[offset+1]=p.y;positions[offset+2]=p.z;velocities[offset]=p.velocity.x;velocities[offset+1]=p.velocity.y;velocities[offset+2]=p.velocity.z;tint.set(p.color);colors[offset]=tint.r;colors[offset+1]=tint.g;colors[offset+2]=tint.b;
    kinds[i]=p.kind;sizes[i]=p.size*(p.kind===1?1+age*1.8:1);alphas[i]=(1-age)*(p.kind===1?.22:1);
-  });
-  for(const attribute of Object.values(geometry.attributes))attribute.needsUpdate=true;
-  shards.forEach((s,i)=>{
+  }
+  if(particlesChanged)for(const attribute of Object.values(geometry.attributes))attribute.needsUpdate=true;
+  let shardsChanged=false;
+  for(const i of activeShards){const s=shards[i];shardsChanged=true;
    s.life-=dt;shardAlpha[i]=s.life>0?Math.min(1,s.life/.18):0;
    if(s.life>0){for(const axis of ['x','y','z']){s[axis]+=s.v[axis]*dt;s.v[axis]-=s.normal[axis]*7*dt;s.rotation[axis]+=s.spin[axis]*dt;}
     dummy.position.set(s.x,s.y,s.z);dummy.rotation.set(s.rotation.x,s.rotation.y,s.rotation.z);dummy.scale.set(s.size*s.aspect,s.size,s.size);
-   }else dummy.scale.setScalar(0);
+   }else {dummy.scale.setScalar(0);activeShards.delete(i);}
    dummy.updateMatrix();glass.setMatrixAt(i,dummy.matrix);
-  });glass.instanceMatrix.needsUpdate=true;shardGeometry.attributes.fade.needsUpdate=true;
+  }
+  if(shardsChanged){glass.instanceMatrix.needsUpdate=true;shardGeometry.attributes.fade.needsUpdate=true;}
  }
  return {box,tire,update};
 }
