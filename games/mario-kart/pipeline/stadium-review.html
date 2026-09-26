@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Converted source stadium verification</title>
+<style>body{margin:0;background:#071020}canvas{display:block}#label{position:absolute;top:18px;left:18px;color:white;font:14px system-ui}</style>
+<div id="label">Converted local source course — geometry verification, not gameplay</div>
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from '/vendor/three-examples/loaders/GLTFLoader.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setSize(innerWidth,innerHeight);renderer.toneMapping=THREE.NeutralToneMapping;document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color('#061020');scene.add(new THREE.HemisphereLight('#d5e1ff','#455154',1.4));const key=new THREE.DirectionalLight('#fff1d2',2.2);key.position.set(-2000,6000,3000);scene.add(key);
+const loader=new GLTFLoader();const [course,kart,route]=await Promise.all([loader.loadAsync('/assets/mario-kart/stadium-source.glb'),loader.loadAsync('/assets/mario-kart/mario-source.glb'),fetch('/assets/mario-kart/stadium-route.json').then(r=>r.json())]);scene.add(course.scene,kart.scene);scene.updateMatrixWorld(true);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,3000),points=route.points.map(p=>({...p,p:new THREE.Vector3(...p.p),n:new THREE.Vector3(...p.n)}));
+const sample=s=>{s=((s%route.length)+route.length)%route.length;const t=s/route.length*(points.length-1),i=Math.floor(t),f=t-i;return{p:points[i].p.clone().lerp(points[i+1].p,f),n:points[i].n.clone().lerp(points[i+1].n,f).normalize()}};
+function pose(s){const p=sample(s),a=sample(s-.4),b=sample(s+.4),f=b.p.sub(a.p).normalize();f.addScaledVector(p.n,-f.dot(p.n)).normalize();const right=new THREE.Vector3().crossVectors(f,p.n).normalize(),basis=new THREE.Matrix4().makeBasis(right,p.n,f.clone().negate());kart.scene.position.copy(p.p).addScaledVector(p.n,.02);kart.scene.quaternion.setFromRotationMatrix(basis);camera.position.copy(p.p).addScaledVector(f,-7.8).addScaledVector(p.n,3.15);camera.up.copy(p.n).multiplyScalar(.72).add(new THREE.Vector3(0,.28,0)).normalize();camera.lookAt(p.p.clone().addScaledVector(f,12).addScaledVector(p.n,1.3));renderer.render(scene,camera);}
+window.sourceStadiumReview={THREE,renderer,scene,camera,course:course.scene,kart:kart.scene,route,pose};pose(0);
+</script>

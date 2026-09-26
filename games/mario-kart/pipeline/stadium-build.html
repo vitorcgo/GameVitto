@@ -1,0 +1,12 @@
+<!doctype html><meta charset="utf-8"><title>Local course asset conversion</title>
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+<script type="module">
+import {assembleSourceStadium} from './source-stadium.js';
+import {GLTFExporter} from '/vendor/three-examples/exporters/GLTFExporter.js';
+window.buildSourceStadium=async({base,files,transform})=>{
+ const root=await assembleSourceStadium(new URL(base,location.href).href,files,transform);
+ const buffer=await new GLTFExporter().parseAsync(root,{binary:true,onlyVisible:true,trs:true});
+ const bytes=new Uint8Array(buffer);let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+ return btoa(binary);
+};
+</script>

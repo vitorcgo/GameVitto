@@ -1,0 +1,38 @@
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#adb3b8;color:#e7e9eb;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace}canvas{display:block;width:100vw;height:100vh}header{position:absolute;left:26px;right:26px;top:20px;display:flex;gap:18px;align-items:center;text-shadow:0 1px 3px #0008}header h1{font-size:19px;letter-spacing:1px;margin:0}#number{color:#f0c56b}#connection{margin-left:auto;font-size:11px}#telemetry{position:absolute;top:76px;left:26px;width:224px;padding:15px 18px;background:#20262bda;border:1px solid #ffffff28}.row{display:flex;align-items:baseline;gap:8px;margin:5px 0}.row>span{color:#aeb9c4;font-size:11px;flex:1}.row strong{font-size:17px;font-weight:500}.row small{font-size:11px;color:#94a1a8}#steering-meter{height:12px;margin:13px 0 4px;position:relative;border-top:2px solid #70808d}#steering-meter i{position:absolute;left:50%;height:10px;top:-5px;border-left:1px solid #9eabb4}#steering-dot{position:absolute;left:50%;top:-5px;width:7px;height:8px;background:#f0c56b;transform:translateX(-50%)}#drift-data{border-top:1px solid #53606b;margin-top:10px;padding-top:10px}.meter{height:5px;background:#4b5560;margin:10px 0}.meter b{height:100%;display:block;width:0;background:#71caf2}.secondary{margin-top:12px;color:#8797a2;font-size:10px}#status{position:absolute;bottom:73px;left:50%;transform:translateX(-50%);padding:7px 13px;background:#20262bd9;white-space:nowrap;font-size:12px}#boost-label{position:absolute;top:22%;left:50%;transform:translateX(-50%);font-size:25px;letter-spacing:6px;color:#ffe0a0;text-shadow:0 2px #644719}footer{position:absolute;bottom:17px;left:26px;right:26px;display:flex;justify-content:space-between;gap:10px;color:#f0f1f1;font-size:11px;text-shadow:0 1px 2px #000}button{font:inherit;background:#20262bd9;color:#d8e0e7;border:1px solid #ffffff33;padding:7px 10px;cursor:pointer}button:hover{background:#39444c}footer button+button{margin-left:6px}#pairing{position:absolute;right:26px;top:76px;width:246px;padding:18px;background:#20262bef;border:1px solid #ffffff28;text-align:center}#pairing h2{font-size:12px;letter-spacing:2px;margin:0 0 14px}#qr{width:176px;height:176px}#pairing p{font-size:11px;color:#c2cdd4}#pairing a{display:block;font-size:10px;color:#8ac9e4;overflow-wrap:anywhere}#pairing small{display:block;font-size:10px;color:#9eabb4;margin:10px 0}#pairing button{font-size:10px;width:100%}[hidden]{display:none!important}@media(max-width:800px){header{left:16px;right:16px;top:14px}header h1{font-size:15px}#telemetry{left:16px;top:60px;width:190px}footer{left:16px;right:16px;font-size:9px}footer button{padding:5px}#pairing{right:16px;top:60px}#status{font-size:10px}}
+
+/* Large, high-contrast instrumentation for filming the screen. */
+header h1{font-size:30px}
+#connection{font-size:16px;font-weight:700}
+#telemetry{width:360px;padding:18px 22px;background:#182026eb;border-color:#ffffff50}
+.row{gap:10px;margin:5px 0;line-height:1.35}
+.row>span{font-size:18px;color:#dae3e9;font-weight:700}
+.row strong{font-size:32px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.row small{font-size:17px;color:#c2cfd8}
+#steering-meter{height:15px;margin:17px 0 8px;border-top-width:4px}
+#steering-meter i{height:18px;top:-10px;border-left-width:2px}
+#steering-dot{width:12px;height:16px;top:-10px}
+#drift-data{margin-top:12px;padding-top:12px;border-top-color:#80909b}
+.meter{height:10px;margin:12px 0}
+.secondary{font-size:16px;color:#bac8d2;margin-top:13px}
+#status{font-size:20px;font-weight:700;padding:9px 16px;max-width:calc(100vw - 52px);white-space:normal;text-align:center;background:#182026eb}
+#boost-label{font-size:48px;font-weight:700}
+footer{font-size:14px;align-items:center}
+@media(max-height:650px){
+ #telemetry{top:65px;padding:12px 18px;width:330px}
+ .row{margin:3px 0}.row strong{font-size:27px}.row>span{font-size:17px}
+ #drift-data{margin-top:7px;padding-top:7px}.secondary{margin-top:7px}
+ #status{font-size:17px;bottom:62px}
+}
+@media(max-width:900px){
+ #telemetry{width:300px;padding:12px 16px}.row strong{font-size:26px}.row>span{font-size:15px}
+ header h1{font-size:24px}#connection{font-size:13px}
+ footer{font-size:11px;flex-wrap:wrap}#status{font-size:16px}
+}
+#status{left:calc(50% + 190px);max-width:calc(100vw - 440px);width:max-content}
+@media(max-width:900px){#status{left:calc(50% + 158px);max-width:calc(100vw - 365px)}}
+
+/* Presentation modes are clean frames for screen recording. */
+body.showcase > :not(#scene):not(#showcase-status) { display:none !important; }
+#showcase-status { position:fixed;inset:0;display:grid;place-content:center;padding:48px;text-align:center;background:#899299;color:#18232d;font:600 20px/1.6 system-ui;z-index:20; }
+#showcase-status[hidden] { display:none; }
+.showcase-keys { position:fixed;right:22px;top:49px;font-size:12px;letter-spacing:.04em;color:#34434d; }

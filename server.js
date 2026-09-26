@@ -1,0 +1,257 @@
+'use strict';
+
+/**
+ * GameVitto — LAN relay server.
+ *
+ * Serves the clients and pipes messages between them:
+ *   /                     → game launcher
+ *   /controller           → phone controller (the "remote", shared by all games)
+ *   /games/<slug>/        → a game's PC client
+ *
+ * The server holds no game state. It is a dumb, low-latency switchboard so the
+ * phone's orientation stream reaches the PC with as few hops as possible.
+ */
+
+const { exec } = require('child_process');
+const express = require('express');
+const fs = require('fs');
+const http = require('http');
+const https = require('https');
+const path = require('path');
+const QRCode = require('qrcode');
+const { Server } = require('socket.io');
+const { ensureCert, preferredAddress } = require('./scripts/gen-cert');
+const { SlotRegistry, feedbackRoute } = require('./relay/slot-registry');
+
+const PORT = Number(process.env.PORT) || 8443;
+const FORCE_HTTP = process.env.HTTP === '1';
+const GAMES_DIR = path.join(__dirname, 'games');
+
+const app = express();
+// no-cache (NOT no-store): browsers must revalidate every file against its
+// ETag on each load, so a plain reload after a git pull always runs current
+// code — while unchanged files still come back as cheap 304s. Heuristic
+// freshness on module scripts otherwise happily serves a stale game.js.
+const NO_CACHE = { setHeaders: (res) => res.set('Cache-Control', 'no-cache') };
+app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'], ...NO_CACHE }));
+app.use('/games', express.static(GAMES_DIR, { extensions: ['html'], ...NO_CACHE }));
+// The shared motion engine, imported directly by games as ES modules.
+app.use('/core', express.static(path.join(__dirname, 'core'), NO_CACHE));
+// Three.js straight from node_modules — no build step, no bundler.
+app.use('/vendor/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build')));
+app.use('/vendor/three-examples', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm')));
+app.use('/assets', express.static(path.join(__dirname, 'assets'), NO_CACHE));
+// Optional audio overrides. Gitignored: nothing copyrighted ships by default.
+app.use('/audio', express.static(path.join(__dirname, 'audio'), { fallthrough: true }));
+
+/**
+ * Discover games from disk rather than a hardcoded list: a game is any folder
+ * under games/ with an index.html. Dropping in a new folder is the whole
+ * install step.
+ *
+ * game.json may set `hidden: true` to keep a game off the menu (still
+ * reachable by URL) and `order` (lower first) to pin its menu position;
+ * unordered games follow alphabetically.
+ */
+function listGames() {
+  let entries;
+  try {
+    entries = fs.readdirSync(GAMES_DIR, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  return entries
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(GAMES_DIR, e.name, 'index.html')))
+    .map((e) => {
+      const meta = { title: e.name, tagline: '', emoji: '🎮' };
+      try {
+        Object.assign(meta, JSON.parse(fs.readFileSync(path.join(GAMES_DIR, e.name, 'game.json'), 'utf8')));
+      } catch { /* game.json is optional */ }
+      return { slug: e.name, url: `/games/${e.name}/`, ...meta };
+    })
+    .filter((g) => !g.hidden)
+    .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.title.localeCompare(b.title));
+}
+
+app.get('/api/games', (_req, res) => res.json(listGames()));
+
+/**
+ * A fresh id per server run. Clients tie their saved calibration to it, so
+ * calibration happens once when you `npm start` and is then inherited by every
+ * page for the life of that run — restart the server and you calibrate again.
+ */
+const BOOT_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+app.get('/api/session', (_req, res) => res.json({ bootId: BOOT_ID }));
+
+const tls = FORCE_HTTP ? null : ensureCert();
+const server = tls ? https.createServer(tls, app) : http.createServer(app);
+const scheme = tls ? 'https' : 'http';
+
+const lanIp = preferredAddress();
+const controllerUrl = `${scheme}://${lanIp}:${PORT}/controller`;
+
+// The PC client fetches this to render a scannable join code.
+app.get('/api/pairing', async (_req, res) => {
+  try {
+    const qr = await QRCode.toDataURL(controllerUrl, {
+      margin: 1,
+      width: 320,
+      color: { dark: '#0b0e14', light: '#ffffff' },
+    });
+    res.json({ url: controllerUrl, qr });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+const io = new Server(server, {
+  // Orientation samples are tiny and constant; skip the polling handshake.
+  transports: ['websocket', 'polling'],
+  pingInterval: 10000,
+  pingTimeout: 5000,
+  cors: { origin: '*' },
+});
+
+/** socket.id → 'game' | 'controller' */
+const roles = new Map();
+
+function countOf(role) {
+  let n = 0;
+  for (const r of roles.values()) if (r === role) n += 1;
+  return n;
+}
+
+/**
+ * Player slots. Only slot 0 is used today, but tagging every packet with its
+ * slot from the start means adding a second phone later is a feature, not a
+ * protocol migration.
+ */
+const MAX_PLAYERS = 4;
+const slotRegistry = new SlotRegistry(MAX_PLAYERS);
+
+function broadcastPresence() {
+  io.emit('presence', {
+    game: countOf('game'),
+    controller: countOf('controller'),
+    slots: slotRegistry.presence(),
+  });
+}
+
+io.on('connection', (socket) => {
+  socket.on('register', (role) => {
+    if (role !== 'game' && role !== 'controller') return;
+    const currentRole = roles.get(socket.id);
+    if (currentRole && currentRole !== role) return;
+
+    if (role === 'controller') {
+      const slot = slotRegistry.assign(socket.id);
+      if (slot === -1) {
+        socket.emit('slot-denied', { reason: 'all player slots full', max: MAX_PLAYERS });
+        console.log(`[rede] controle recusado. As ${MAX_PLAYERS} vagas estão ocupadas (${socket.id})`);
+        return;
+      }
+      if (!currentRole) {
+        roles.set(socket.id, role);
+        socket.join(role);
+        console.log(`[rede] controle conectado como jogador ${slot + 1} (${socket.id})`);
+      }
+      socket.emit('slot', { slot });
+    } else if (!currentRole) {
+      roles.set(socket.id, role);
+      socket.join(role);
+      console.log(`[rede] jogo conectado (${socket.id})`);
+    }
+    broadcastPresence();
+  });
+
+  // Latency probe. Echoed straight back so the game can measure a true round
+  // trip — a one-way timestamp would need synchronised clocks across devices.
+  socket.on('ping-probe', (data) => socket.to('controller').emit('ping-probe', data));
+  socket.on('pong-probe', (data) => socket.to('game').emit('pong-probe', data));
+
+  // Phone → PC.
+  //
+  // NOT volatile. Socket.IO discards volatile packets whenever the transport
+  // reports itself unwritable, which on the long-polling transport is most of
+  // the time — so a connection that falls back to polling (easy to trigger with
+  // a self-signed cert) drops effectively the entire orientation stream while
+  // ordinary emits still get through. That failure is invisible: the phone
+  // connects, commands work, and the blade simply never moves. The payload is
+  // ~100 bytes at 60Hz; the rate cap on the sender is the real backpressure.
+  socket.on('orientation', (data) => {
+    const slot = slotRegistry.slotOf(socket.id);
+    if (roles.get(socket.id) !== 'controller' || slot === -1) return;
+    socket.to('game').emit('orientation', { ...data, slot });
+  });
+
+  socket.on('motion', (data) => {
+    const slot = slotRegistry.slotOf(socket.id);
+    if (roles.get(socket.id) !== 'controller' || slot === -1) return;
+    socket.to('game').emit('motion', { ...data, slot });
+  });
+
+  // Phone → PC control actions: calibrate, start, pause, sensitivity nudges.
+  socket.on('command', (data) => {
+    const slot = slotRegistry.slotOf(socket.id);
+    if (roles.get(socket.id) !== 'controller' || slot === -1) return;
+    socket.to('game').emit('command', { ...data, slot });
+  });
+
+  // PC → phone feedback: hits (haptics), score, game state.
+  //
+  // A message with a `slot` goes to that one phone only — e.g. a multiplayer
+  // slice should buzz the hand that swung it, not every hand in the lobby.
+  // Anything without a slot broadcasts to every controller, unchanged from
+  // before slots existed — every existing single-player game's feedback
+  // calls omit it, so this is purely additive.
+  socket.on('feedback', (data) => {
+    if (roles.get(socket.id) !== 'game') return;
+    const route = feedbackRoute(slotRegistry, data);
+    if (route.type === 'socket') {
+      io.to(route.socketId).emit('feedback', data);
+    } else if (route.type === 'broadcast') {
+      socket.to('controller').emit('feedback', data);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const role = roles.get(socket.id);
+    roles.delete(socket.id);
+    slotRegistry.release(socket.id);
+    if (role) console.log(`[rede] ${role === 'game' ? 'jogo' : 'controle'} desconectado (${socket.id})`);
+    broadcastPresence();
+  });
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  const line = '─'.repeat(52);
+  console.log(`\n${line}`);
+  console.log('  🕹  GameVitto | Central de jogos do VitorCGO');
+  console.log(line);
+  console.log(`  Tela principal       ${scheme}://localhost:${PORT}/`);
+  console.log(`  Controle no celular  ${controllerUrl}`);
+  const games = listGames();
+  console.log(`\n  ${games.length} ${games.length === 1 ? 'jogo disponível' : 'jogos disponíveis'}:`);
+  for (const g of games) console.log(`    ${g.emoji}  ${g.title}  →  ${g.url}`);
+  if (!tls) {
+    console.log('\n  ⚠  Servidor executado em HTTP comum. Os sensores do celular');
+    console.log('     só funcionam em localhost ou por uma conexão HTTPS.');
+  } else {
+    console.log('\n  ⚠  O certificado é autoassinado. O celular mostrará um aviso');
+    console.log('     na primeira conexão. Abra as opções avançadas e continue.');
+  }
+
+  // One command, whole console: npm start also opens the TV browser — its
+  // own Chrome profile so the autoplay flag genuinely applies (handing the
+  // URL to an already-running Chrome silently drops process flags).
+  // HTTP dev mode and NO_OPEN=1 skip this.
+  if (tls && process.platform === 'darwin' && !process.env.NO_OPEN) {
+    exec('open -na "Google Chrome" --args'
+      + ' --user-data-dir="$HOME/.gamevitto-chrome" --no-first-run --no-default-browser-check'
+      + ` --autoplay-policy=no-user-gesture-required --new-window https://localhost:${PORT}/`);
+    console.log('\n  📺 Abrindo o GameVitto no Chrome com reprodução automática…');
+    console.log('     Use NO_OPEN=1 npm start para não abrir o navegador.');
+  }
+  console.log(`${line}\n`);
+});

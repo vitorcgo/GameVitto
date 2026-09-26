@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>Local kart asset conversion</title>
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+<script type="module">
+import {assembleKart} from './source-models.js';
+import {assembleRival} from './source-rivals.js';
+import {GLTFExporter} from '/vendor/three-examples/exporters/GLTFExporter.js';
+window.buildSourceKart=async(base,id)=>{
+ const url=new URL(base,location.href).href;
+ const root=id?await assembleRival(id,url):await assembleKart(url);
+ const buffer=await new GLTFExporter().parseAsync(root,{binary:true,onlyVisible:true,trs:true});
+ const bytes=new Uint8Array(buffer);let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+ return btoa(binary);
+};
+</script>

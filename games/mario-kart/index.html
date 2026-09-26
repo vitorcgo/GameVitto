@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Mario Kart | GameVitto</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="game" aria-label="Corrida no Estádio Mario Kart"></canvas>
+    <div id="scene-loading" role="status" aria-live="polite">
+      <img src="menu-logo.svg" alt="" />
+      <div class="scene-loading-line"><i></i></div>
+      <span>PREPARANDO A PISTA</span>
+    </div>
+    <div id="speed-lines"></div>
+    <div id="hit-flash"></div>
+    <div id="hud" hidden>
+      <div id="item-frame">
+        <div id="item-icon"></div>
+        <span id="item-caption">ITEM</span><span class="keycap">→ / SPACE</span>
+      </div>
+      <div id="race-brand"><b>MARIOKART</b><span>ESTÁDIO</span></div>
+      <div id="lap-panel">
+        <span id="coin-icon" aria-label="Moedas"></span><b id="coins">00</b
+        ><i></i
+        ><span class="flag" aria-label="Volta"
+          ><svg viewBox="0 0 28 32" aria-hidden="true">
+            <path
+              d="M3 30V3h22v18H4"
+              fill="none"
+              stroke="white"
+              stroke-width="2.8"
+            />
+            <path
+              d="M5 4h6v5H5m12-5h6v5h-6M11 9h6v5h-6M5 14h6v5H5m12-5h6v5h-6"
+              fill="white"
+            /></svg></span
+        ><b id="lap">1 <small>/ 3</small></b>
+      </div>
+      <div id="position">8<sup>º</sup></div>
+      <canvas id="minimap" width="250" height="220"></canvas>
+      <div id="speed">
+        <b id="speed-number">0</b><span>km/h</span>
+        <div id="speed-bar"></div>
+      </div>
+      <div id="drift-meter">
+        <span id="drift-label">MINI-TURBO</span>
+        <div id="drift-fill"></div>
+      </div>
+      <div id="notice"></div>
+      <div id="countdown">
+        <div id="lamps"><i></i><i></i><i></i></div>
+        <b id="count-number"></b><div id="wheel-ready" hidden>Segure o celular de lado e nivelado<br><small>A contagem começa quando o volante estiver pronto</small></div>
+      </div>
+    </div>
+    <div id="topline">
+      <a href="/" id="home">⌂ <span>INÍCIO</span></a
+      ><span id="connection">TECLADO PRONTO</span
+      ><button id="fullscreen" aria-label="Alternar tela cheia">
+        ⛶ TELA CHEIA</button
+      ><button id="mute" aria-label="Alternar som">♪ SOM LIGADO</button>
+    </div>
+    <div id="intro">
+      <header class="menu-brand">
+        <div class="eyebrow">COPA COGUMELO <b>150 cc</b></div>
+        <h1><img src="menu-logo.svg" alt="Mario Kart"></h1>
+        <div class="stadium-name">ESTÁDIO MARIO KART <span>★</span></div>
+      </header>
+      <section class="driver-panel" aria-labelledby="driver-title">
+        <p class="intro-copy" id="driver-title">Escolha seu piloto</p>
+        <div id="characters" role="group" aria-label="Escolher personagem"></div>
+        <div class="driver-name"><span>PILOTO</span><strong id="chosen">MARIO</strong></div>
+      </section>
+      <section class="race-panel" aria-label="Configuração da corrida">
+        <div id="lap-options" role="group" aria-label="Duração da corrida">
+          <span>DURAÇÃO DA CORRIDA</span>
+          <button type="button" data-laps="1" aria-pressed="false">1 VOLTA</button>
+          <button type="button" data-laps="3" aria-pressed="true">3 VOLTAS</button>
+        </div>
+        <button id="start">CONFIRMAR PILOTO <span>② OK</span></button>
+        <p id="menu-hint">Use o direcional para escolher. Pressione ② para confirmar.</p>
+      </section>
+      <div class="controls-card">
+        <p class="controls">
+          <b>CELULAR</b> Segure de lado com a tela para cima. Incline para virar.<br /><b>2</b> acelerar
+          &nbsp; <b>1</b> frear &nbsp; <b>A</b> derrapar &nbsp; <b>→</b> item<br /><b
+            >TECLADO</b
+          >
+          ← → virar, Z acelerar, X frear, Shift derrapar, Espaço usar item
+        </p>
+      </div>
+    </div>
+    <div id="track-label">
+      <span>COPA COGUMELO</span><b>Estádio Mario Kart</b
+      ><small>3 VOLTAS, 8 PILOTOS, ESTÁDIO MARIO KART</small>
+    </div>
+    <div id="bottomline">
+      <span id="wheel-status">Z acelerar, X frear, Shift derrapar, Espaço usar item</span
+      ><span>F tela cheia, C ocultar interface, Esc pausar</span>
+    </div>
+    <div id="pause" class="scrim" hidden>
+      <div class="pause-panel">
+        <h2>PAUSADO</h2>
+        <p id="pause-reason">Respire um pouco. A corrida vai esperar.</p>
+        <button id="resume">VOLTAR À CORRIDA</button
+        ><a href="/">Voltar ao início</a>
+      </div>
+    </div>
+    <div id="results" class="scrim" hidden>
+      <div class="results-panel">
+        <div class="eyebrow">COPA COGUMELO, ESTÁDIO MARIO KART</div>
+        <h2>Resultado da corrida</h2>
+        <p id="result-summary"></p>
+        <div id="standings"></div>
+        <button id="again">CORRER NOVAMENTE <span>② / ENTER →</span></button
+        ><a href="/">Voltar ao início</a>
+      </div>
+    </div>
+    <div id="error" hidden></div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="game.js"></script>
+  </body>
+</html>

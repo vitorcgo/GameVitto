@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#10141c" />
+<title>Controle | GameVitto</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 20%, #1a2130, #10141c 70%);
+    color: #e8ecf4;
+    font: 500 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none; touch-action: none; user-select: none;
+  }
+  #app {
+    height: 100%;
+    padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column;
+  }
+
+  /* All status lives ON the remote (LEDs, power glow) or in the button-2
+     sheet — the screen holds nothing but the remote itself. */
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4b5468; flex: none; }
+  .dot.on  { background: #35d07f; box-shadow: 0 0 10px #35d07f88; }
+  .dot.err { background: #ff5f6d; }
+
+  /* ── The remote ──────────────────────────────────────────────────────── */
+  #stage { flex: 1; display: flex; perspective: 900px; min-height: 0; }
+  #remote {
+    width: min(86vw, 330px); margin: auto; height: 100%; max-height: 780px;
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(8px, calc(1.8 * var(--remote-vh, 1vh)), 20px) 24px clamp(6px, calc(1.4 * var(--remote-vh, 1vh)), 14px);
+    gap: clamp(3px, calc(1 * var(--remote-vh, 1vh)), 12px);
+    background: linear-gradient(175deg, #fdfdfe, #eef1f5 55%, #e2e7ed);
+    border: 1px solid #cfd6de; border-radius: 34px;
+    box-shadow: 0 26px 70px #000a, inset 0 2px 0 #fff, inset 0 -16px 34px #00000012;
+    transition: filter .45s ease;
+    transform-style: preserve-3d; will-change: transform;
+  }
+  #remote.asleep { filter: grayscale(.55) brightness(.72); }
+  .sp { flex: 1; }
+
+  button { font: inherit; color: inherit; border: none; background: none; padding: 0; }
+  button:active { }
+
+  /* Power — white face with the red icon, like the real one. Still doubles
+     as the connection light: soft blue halo when linked to the PC, red halo
+     when the server is unreachable. */
+  #row-top { width: 100%; display: flex; flex: none; position: relative;
+             align-items: flex-start; min-height: clamp(38px, calc(6 * var(--remote-vh, 1vh)), 48px); }
+  #pwr-wrap { display: flex; flex-direction: column; align-items: center; }
+  #power {
+    width: clamp(30px, calc(4.6 * var(--remote-vh, 1vh)), 38px); height: clamp(30px, calc(4.6 * var(--remote-vh, 1vh)), 38px); border-radius: 50%;
+    background: linear-gradient(180deg, #ffffff, #e8edf2);
+    border: 1px solid #c6cfd9;
+    color: #d92b1f; font-size: 15px;
+    box-shadow: 0 2px 4px #0002, inset 0 1px 0 #fff;
+    transition: box-shadow .4s ease;
+  }
+  #power:active { transform: translateY(1px); }
+  #power.linked { box-shadow: 0 2px 4px #0002, inset 0 1px 0 #fff, 0 0 14px #45a6ff66; }
+  #power.err { box-shadow: 0 2px 4px #0002, inset 0 1px 0 #fff, 0 0 14px #ff5f6d99; }
+  #brand { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+           font-size: clamp(13px, calc(2 * var(--remote-vh, 1vh)), 16px); font-weight: 700; color: #aab7c4; }
+
+  /* D-pad: a solid cross. Sized by viewport height so short phones still fit
+     the whole face; segments are percentages of the pad, not pixels. */
+  /* One-piece cross. Three tricks:
+     - each segment's background is its SLICE of one continuous top-to-bottom
+       gradient, so every junction's tones match exactly;
+     - no per-arm drop shadows (they cast onto neighbouring arms as phantom
+       inner lines) — instead the container's drop-shadow filter wraps the
+       composited silhouette, giving one cross-shaped shadow;
+     - the centre paints last, borderless and a hair oversized, covering the
+       arms' inner border edges. */
+  #dpad { position: relative; width: clamp(84px, calc(15 * var(--remote-vh, 1vh)), 128px); height: clamp(84px, calc(15 * var(--remote-vh, 1vh)), 128px);
+          flex: none; filter: drop-shadow(0 3px 6px rgba(30, 50, 80, .16)); }
+  .dp {
+    position: absolute; width: 34.4%; height: 34.4%;
+    border: 1px solid #c6cfd9;
+    box-shadow: inset 0 1px 0 #fff;
+  }
+  .dp:active { filter: brightness(0.93); }
+  .dp.u { left: 32.8%; top: 0;    border-radius: 10px 10px 0 0;
+          background: linear-gradient(180deg, #ffffff, #f3f6f8); }
+  .dp.d { left: 32.8%; bottom: 0; border-radius: 0 0 10px 10px;
+          background: linear-gradient(180deg, #ebeff3, #e6ebf0); }
+  .dp.l { left: 0;     top: 32.8%; border-radius: 10px 0 0 10px;
+          background: linear-gradient(180deg, #f3f6f8, #ebeff3); }
+  .dp.r { right: 0;    top: 32.8%; border-radius: 0 10px 10px 0;
+          background: linear-gradient(180deg, #f3f6f8, #ebeff3); }
+  .dp.c { left: calc(32.8% - 1.5px); top: calc(32.8% - 1.5px);
+          width: calc(34.4% + 3px); height: calc(34.4% + 3px);
+          border-radius: 0; box-shadow: none; border: none;
+          background: linear-gradient(180deg, #f3f6f8, #ebeff3);
+          pointer-events: none; z-index: 1; }
+  .dp::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+    border: 7px solid transparent; opacity: .45;
+  }
+  .dp.u::after { border-bottom-color: #5a6c80; transform: translate(-50%, -80%); }
+  .dp.d::after { border-top-color: #5a6c80;    transform: translate(-50%, -20%); }
+  .dp.l::after { border-right-color: #5a6c80;  transform: translate(-80%, -50%); }
+  .dp.r::after { border-left-color: #5a6c80;   transform: translate(-20%, -50%); }
+  .dp.c::after { display: none; }
+
+  /* A — the hero button. */
+  #btn-a {
+    width: clamp(64px, calc(12 * var(--remote-vh, 1vh)), 96px); height: clamp(64px, calc(12 * var(--remote-vh, 1vh)), 96px);
+    border-radius: 50%; flex: none;
+    background: linear-gradient(180deg, #ffffff, #eef2f6);
+    border: 1px solid #c6cfd9;
+    box-shadow: 0 4px 10px #0003, inset 0 2px 0 #fff, inset 0 -6px 12px #a9b6c322;
+    color: #55708e; font-size: clamp(26px, calc(4.8 * var(--remote-vh, 1vh)), 38px); font-weight: 700;
+    transition: transform .06s ease;
+  }
+  #btn-a:active {
+    transform: scale(.94);
+    box-shadow: 0 1px 3px #0003, inset 0 3px 9px #8fa1b455;
+  }
+
+  /* B — the underside trigger, peeking in. */
+  #btn-b {
+    width: 62%; height: clamp(38px, calc(6 * var(--remote-vh, 1vh)), 46px);
+    border-radius: 14px 14px 22px 22px; flex: none;
+    background: linear-gradient(180deg, #a7b0ba, #8a939d);
+    box-shadow: inset 0 1px 0 #ffffff44, 0 3px 7px #0003;
+    color: #fff; font-size: 22px; font-weight: 700;
+  }
+  #btn-b:active { transform: translateY(2px); filter: brightness(1.2); }
+
+  /* − ⌂ + */
+  #row-mid { display: flex; align-items: center; gap: 22px; flex: none; }
+  .pill {
+    width: clamp(34px, calc(5.4 * var(--remote-vh, 1vh)), 42px); height: clamp(34px, calc(5.4 * var(--remote-vh, 1vh)), 42px); border-radius: 50%;
+    background: linear-gradient(180deg, #f2f5f8, #dde3ea);
+    border: 1px solid #c6cfd9; box-shadow: 0 2px 4px #0002, inset 0 1px 0 #fff;
+    color: #5a6c80; font-size: 22px; font-weight: 700;
+  }
+  #btn-home { width: clamp(40px, calc(6.4 * var(--remote-vh, 1vh)), 50px); height: clamp(40px, calc(6.4 * var(--remote-vh, 1vh)), 50px); font-size: 21px;
+    background: linear-gradient(180deg, #4a5560, #39424c); border-color: #2e363f;
+    color: #e8ecf4; }
+  .pill:active { transform: scale(.92); box-shadow: 0 1px 2px #0002, inset 0 2px 6px #8fa1b444; }
+  .pill small { display: block; font-size: 8px; font-weight: 600; letter-spacing: .04em;
+                color: #93a3b4; margin-top: -3px; }
+
+  /* Speaker grille — pulses when the remote "speaks". */
+  #speaker { display: grid; grid-template-columns: repeat(5, 7px);
+             gap: clamp(5px, calc(1 * var(--remote-vh, 1vh)), 8px) 8px; flex: none; }
+  #speaker i {
+    width: 7px; height: 7px; border-radius: 50%; background: #c3ccd5;
+    box-shadow: inset 0 1px 1px #0002; transition: background .12s, box-shadow .12s;
+  }
+  #speaker.talk i { background: #6fb2ff; box-shadow: 0 0 8px #6fb2ff88; }
+
+  /* 1 / 2 */
+  #ones { display: flex; flex-direction: column; gap: clamp(6px, calc(1.2 * var(--remote-vh, 1vh)), 12px);
+          align-items: center; flex: none; }
+  .num {
+    width: clamp(34px, calc(5.8 * var(--remote-vh, 1vh)), 46px); height: clamp(34px, calc(5.8 * var(--remote-vh, 1vh)), 46px); border-radius: 50%;
+    background: linear-gradient(180deg, #f2f5f8, #dde3ea);
+    border: 1px solid #c6cfd9; box-shadow: 0 2px 4px #0002, inset 0 1px 0 #fff;
+    color: #5a6c80; font-size: 19px; font-weight: 700;
+  }
+  .num:active { transform: scale(.92); box-shadow: inset 0 2px 6px #8fa1b444; }
+
+  /* Player LEDs. */
+  #leds { display: flex; gap: 14px; flex: none;
+          margin-bottom: clamp(4px, calc(1.2 * var(--remote-vh, 1vh)), 12px); }
+  #leds i {
+    width: 13px; height: 8px; border-radius: 2.5px; background: #c3ccd5;
+    box-shadow: inset 0 1px 1px #0003;
+  }
+  #leds i.on { background: #45c1ff; box-shadow: 0 0 9px #45c1ffcc; }
+  #leds.seek i { animation: led-seek 1.2s infinite; }
+  #leds.seek i:nth-child(2) { animation-delay: .15s; }
+  #leds.seek i:nth-child(3) { animation-delay: .3s; }
+  #leds.seek i:nth-child(4) { animation-delay: .45s; }
+  @keyframes led-seek {
+    0%, 60%, 100% { background: #c3ccd5; box-shadow: inset 0 1px 1px #0003; }
+    20% { background: #45c1ff; box-shadow: 0 0 9px #45c1ffcc; }
+  }
+
+
+  /* Landscape / very short: drop the decorative rows, tuck 1 and 2 side by
+     side, and let the big controls shrink further. */
+  @media (max-height: 560px) {
+    body:not(.wheel-mode) #speaker { display: none; }
+    body:not(.wheel-mode) #remote { gap: 2px; padding: 8px 24px 6px; }
+    body:not(.wheel-mode) #ones { flex-direction: row; gap: 10px; }
+    body:not(.wheel-mode) #dpad { width: clamp(64px, calc(15 * var(--remote-vh, 1vh)), 128px); height: clamp(64px, calc(15 * var(--remote-vh, 1vh)), 128px); }
+    body:not(.wheel-mode) #btn-a { width: clamp(50px, calc(12 * var(--remote-vh, 1vh)), 96px); height: clamp(50px, calc(12 * var(--remote-vh, 1vh)), 96px); }
+    body:not(.wheel-mode) #btn-b { height: clamp(30px, calc(6 * var(--remote-vh, 1vh)), 46px); }
+    body:not(.wheel-mode) #power { width: 30px; height: 30px; }
+    body:not(.wheel-mode) .num { width: clamp(30px, calc(5.8 * var(--remote-vh, 1vh)), 46px); height: clamp(30px, calc(5.8 * var(--remote-vh, 1vh)), 46px); }
+    body:not(.wheel-mode) .pill { width: clamp(28px, calc(5.4 * var(--remote-vh, 1vh)), 42px); height: clamp(28px, calc(5.4 * var(--remote-vh, 1vh)), 42px); }
+    body:not(.wheel-mode) #btn-home { width: clamp(32px, calc(6.4 * var(--remote-vh, 1vh)), 50px); height: clamp(32px, calc(6.4 * var(--remote-vh, 1vh)), 50px); }
+  }
+
+  /* ── Wake gate ───────────────────────────────────────────────────────── */
+  #gate {
+    position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+    background: #10141cd8; backdrop-filter: blur(4px); padding: 24px;
+  }
+  #gate.hide { display: none; }
+  #gate .card {
+    background: #161c29; border: 1px solid #262f42; border-radius: 20px;
+    padding: 26px 22px; max-width: 360px; text-align: center;
+  }
+  #gate h1 { margin: 0 0 8px; font-size: 20px; }
+  #gate p { color: #8b95ad; font-size: 14px; margin: 0 0 20px; }
+  #enable {
+    width: 100%; padding: 18px; border-radius: 14px; font-size: 17px; font-weight: 700;
+    background: linear-gradient(160deg, #3c8cf0, #2361c9); color: #fff;
+    box-shadow: 0 6px 18px #2361c966;
+  }
+  #enable:active { transform: scale(.98); }
+  #enable:disabled { opacity: .4; }
+
+  /* ── Status sheet (button 2) ─────────────────────────────────────────── */
+  #sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
+    background: #141926f5; border-top: 1px solid #262f42;
+    border-radius: 18px 18px 0 0; padding: 16px 18px max(16px, env(safe-area-inset-bottom));
+    transform: translateY(105%); transition: transform .28s cubic-bezier(.3,.9,.3,1);
+    max-height: 72%; overflow: auto;
+  }
+  #sheet.open { transform: translateY(0); }
+  #sheet h2 { margin: 0 0 8px; font-size: 15px; }
+  .muted { color: #8b95ad; font-size: 13px; }
+  #rates { font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  #diag { margin-top: 12px; border: 1px solid #472531; background: #26141a;
+          border-radius: 12px; padding: 12px; }
+  #diag b { display: block; margin-bottom: 4px; font-size: 14px; }
+  #diag-dump {
+    margin: 10px 0 0; padding: 10px; background: #0b0e14; border-radius: 9px;
+    font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: #8b95ad; white-space: pre-wrap; word-break: break-all;
+    max-height: 170px; overflow: auto; user-select: text; -webkit-user-select: text;
+  }
+  .hide { display: none !important; }
+
+/* Wheel profile: large, separated multi-touch pedals with clear Wii labels. */
+#wheel-guide { display:none; }
+html.wheel-mode, html.wheel-mode body {background:#10141c;color-scheme:dark;}
+/* Paint the entire browser canvas, including landscape safe-area gutters. */
+body.wheel-mode::before {content:'';position:fixed;inset:0;background:#10141c;pointer-events:none;z-index:-1;}
+/* The phone is a physical remote. Rotate its portrait canvas back when the
+   browser rotates; do not rearrange its buttons or follow the steering tilt. */
+.wheel-mode #app {position:fixed;left:50%;top:50%;width:var(--remote-width);height:var(--remote-height);padding:12px 14px;transform:translate(-50%,-50%) rotate(var(--remote-angle));transform-origin:center;}
+.wheel-mode #remote {width:min(calc(var(--remote-width) * .86),330px);transform:none!important;}
+/* Tablets fit a proportionally enlarged face along the long edge. */
+.wheel-mode.wheel-tablet #remote {width:360px;height:780px;max-height:none;flex-shrink:0;transform:scale(var(--remote-scale))!important;transform-origin:center;}
+.wheel-mode #wheel-guide {display:block;position:absolute;left:calc(100% - 11px);top:50%;width:var(--remote-height);text-align:center;white-space:nowrap;transform:translate(-50%,-50%) rotate(90deg);font:700 12px system-ui;color:#b6d4e6;pointer-events:none;}
+.wheel-mode.wheel-tablet #wheel-guide {font-size:17px;}
+.wheel-mode #btn-a,.wheel-mode .num {position:relative;}
+.wheel-mode #btn-a::after,.wheel-mode .num::after {position:absolute;left:calc(100% + 7px);top:50%;transform:translateY(-50%);font:700 10px system-ui;color:#526c82;}
+.wheel-mode #btn-a::after {content:'DERRAPAR';}
+.wheel-mode #btn-1::after {content:'FREIO';}
+.wheel-mode #btn-2::after {content:'ACELERAR / OK';white-space:nowrap;}
+.wheel-mode .dp.r::before {content:'ITEM';position:absolute;left:calc(100% + 6px);top:50%;transform:translateY(-50%);font:700 10px system-ui;color:#526c82;}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="wheel-guide">MARIO KART. SEGURE DE LADO</div>
+  <div id="stage">
+    <div id="remote" class="asleep">
+      <div id="row-top">
+        <div id="pwr-wrap"><button id="power" aria-label="ligar">⏻</button></div>
+        <div id="brand">GameVitto</div>
+      </div>
+
+      <div id="dpad">
+        <button class="dp u" aria-label="cima"></button>
+        <button class="dp l" aria-label="esquerda"></button>
+        <span class="dp c"></span>
+        <button class="dp r" aria-label="direita"></button>
+        <button class="dp d" aria-label="baixo"></button>
+      </div>
+
+      <div class="sp"></div>
+      <button id="btn-a">A</button>
+      <div class="sp"></div>
+      <button id="btn-b">B</button>
+      <div class="sp"></div>
+
+      <div id="row-mid">
+        <button class="pill" id="btn-minus">−</button>
+        <button class="pill" id="btn-home">⌂</button>
+        <button class="pill" id="btn-plus">+</button>
+      </div>
+
+      <div class="sp"></div>
+      <div id="speaker">
+        <i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i>
+        <i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div class="sp"></div>
+
+      <div id="ones">
+        <button class="num" id="btn-1">1</button>
+        <button class="num" id="btn-2">2</button>
+      </div>
+
+      <div class="sp"></div>
+      <div id="leds" class="seek"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div id="gate">
+    <div class="card">
+      <h1>🕹 Ative o controle</h1>
+      <p>Permita o acesso aos movimentos. Depois segure o celular de forma confortável e aponte para a tela.</p>
+      <button id="enable">Ativar sensores de movimento</button>
+    </div>
+  </div>
+
+  <div id="sheet">
+    <h2>Estado</h2>
+    <div class="muted" style="display:flex;align-items:center;gap:8px;">
+      <span class="dot" id="dot-net"></span><span id="net">conectando…</span>
+      <span id="player" class="hide" style="color:#7fb7ff;font-weight:600;">P1</span>
+      <span id="hz" style="margin-left:auto;font-variant-numeric:tabular-nums;">0 Hz</span>
+    </div>
+    <div class="muted" id="rates">sensor 0 Hz, enviado 0 Hz, desconectado</div>
+    <div class="muted" style="margin-top:10px;font-size:11px;">
+      <b>A</b> selecionar, <b>B</b> voltar, <b>⌂</b> início, <b>−/+</b> velocidade,
+      <b>1</b> recentralizar, <b>2</b> esta tela
+    </div>
+    <div id="diag" class="hide">
+      <b id="diag-title">⚠️ Sem dados dos sensores</b>
+      <div class="muted" id="diag-body"></div>
+      <pre id="diag-dump"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/controller.js"></script>
+</body>
+</html>

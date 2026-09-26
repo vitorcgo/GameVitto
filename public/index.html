@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GameVitto</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #0a1017;
+      --panel: #111c26;
+      --panel-2: #182a36;
+      --paper: #f5f1e8;
+      --muted: #9fb0bd;
+      --red: #ef3f4f;
+      --yellow: #ffd447;
+      --cyan: #2bc7d5;
+      --line: #304350;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: var(--ink);
+      color: var(--paper);
+      font: 600 16px/1.45 "Trebuchet MS", Tahoma, sans-serif;
+      user-select: none;
+    }
+    button { font: inherit; }
+    button:focus-visible, a:focus-visible { outline: 4px solid var(--yellow); outline-offset: 5px; }
+    .backdrop-mark {
+      position: fixed;
+      width: 38vw;
+      aspect-ratio: 1;
+      right: -16vw;
+      top: 12vh;
+      border: 7vw solid #0e1821;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .backdrop-line {
+      position: fixed;
+      left: 0;
+      right: 0;
+      top: 35%;
+      height: 1px;
+      background: #1b2a35;
+      pointer-events: none;
+    }
+    header {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 88px;
+      padding: 20px clamp(24px, 4vw, 72px);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; letter-spacing: .04em; }
+    .brand-mark { display: block; width: 52px; height: 52px; object-fit: contain; }
+    .brand strong { display: block; font-size: 21px; }
+    .brand small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .18em; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .github-link, #connection {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+    .github-link { color: var(--paper); text-decoration: none; transition: border-color .15s ease, color .15s ease; }
+    .github-link:hover { color: var(--yellow); border-color: var(--yellow); }
+    #connection-dot { width: 9px; height: 9px; border-radius: 50%; background: #657580; }
+    #connection.connected #connection-dot { background: #42dc83; box-shadow: 0 0 0 4px #193e2c; }
+    main {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(280px, .9fr) minmax(500px, 1.2fr);
+      gap: clamp(28px, 4vw, 68px);
+      width: min(1440px, calc(100% - 8vw));
+      min-height: calc(100vh - 166px);
+      margin: 0 auto;
+      padding: clamp(26px, 4vh, 48px) 0 30px;
+      align-items: center;
+    }
+    .intro { align-self: center; animation: enter-left .5s ease-out both; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 18px;
+      color: var(--cyan);
+      font-size: 12px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 30px; height: 5px; background: var(--cyan); }
+    h1 {
+      max-width: 680px;
+      margin: 0;
+      font-family: Bahnschrift, "Arial Narrow", Impact, sans-serif;
+      font-size: clamp(45px, 4.8vw, 79px);
+      line-height: .96;
+      letter-spacing: -.035em;
+      text-wrap: balance;
+    }
+    h1 em { color: var(--yellow); font-style: normal; }
+    .intro > p {
+      max-width: 570px;
+      margin: 24px 0 30px;
+      color: var(--muted);
+      font-size: clamp(15px, 1.2vw, 19px);
+      font-weight: 500;
+    }
+    .steps { display: grid; grid-template-columns:repeat(3,1fr); gap: 10px; max-width: 600px; }
+    .step {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 15px;
+      min-height: 105px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: #d9e2e8;
+      font-size: 13px;
+    }
+    .step b { color: var(--yellow); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 24px; line-height: 1; }
+    .content { display: grid; grid-template-columns: 1fr 190px; gap: 18px; animation: enter-right .55s .08s ease-out both; }
+    #game-card {
+      position: relative;
+      min-height: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 2px solid #334957;
+      background: var(--panel);
+      color: var(--paper);
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 14px 14px 0 #05080c;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    #game-card:disabled { cursor: wait; opacity: .72; }
+    #game-card:not(:disabled):hover, #game-card.is-hovered {
+      transform: translate(-5px, -5px);
+      border-color: var(--yellow);
+      box-shadow: 19px 19px 0 #05080c;
+    }
+    .game-art {
+      position: relative;
+      display: grid;
+      place-items: center;
+      height: clamp(285px, 38vh, 370px);
+      min-height: 0;
+      padding: 34px;
+      overflow: hidden;
+      background: #2b7ec1;
+      border-bottom: 10px solid var(--red);
+    }
+    .game-art::before, .game-art::after {
+      content: "";
+      position: absolute;
+      background: #246ba4;
+      transform: rotate(-14deg);
+    }
+    .game-art::before { width: 42%; height: 160%; left: -12%; top: -30%; }
+    .game-art::after { width: 16%; height: 160%; right: 7%; top: -30%; }
+    .game-number { position: absolute; left: 24px; top: 16px; color: #ffffff55; font-size: 62px; font-weight: 1000; line-height: 1; }
+    #game-logo { position: absolute; z-index: 2; left: 6%; top: 9%; display: block; width: min(62%, 430px); filter: drop-shadow(7px 8px 0 #123a5c); }
+    #kart-card-art { position: absolute; z-index: 1; right: -2%; bottom: -2%; display: block; width: 96%; max-height: 88%; object-fit: contain; transform: none; filter: drop-shadow(8px 12px 0 #17334a88); }
+    .game-info { display: grid; grid-template-columns: 1fr auto; gap: 9px 18px; padding: clamp(18px, 1.7vw, 26px); }
+    .available { color: var(--cyan); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; }
+    #game-title { margin: 0; font-size: clamp(28px, 2.5vw, 42px); line-height: 1; letter-spacing: -.03em; }
+    #game-tagline { grid-column: 1; margin: 0; color: var(--muted); font-size: 13px; font-weight: 500; }
+    .play-label {
+      grid-column: 2;
+      grid-row: 1 / 4;
+      align-self: center;
+      padding: 15px 17px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 1000;
+      letter-spacing: .08em;
+    }
+    .pair-card {
+      align-self: end;
+      padding: 13px;
+      border-top: 8px solid var(--cyan);
+      background: var(--paper);
+      color: var(--ink);
+      box-shadow: 9px 9px 0 #05080c;
+    }
+    .pair-card h2 { margin: 0 0 5px; font-size: 16px; }
+    .pair-card p { margin: 0 0 13px; color: #5a6b76; font-size: 11px; font-weight: 600; }
+    #pair-qr { display: block; width: 100%; aspect-ratio: 1; background: #fff; image-rendering: pixelated; }
+    #pair-loading { display: grid; place-items: center; width: 100%; aspect-ratio: 1; background: #e3e7e8; color: #66747c; font-size: 11px; }
+    #pair-qr:not([src]) { display: none; }
+    .pair-ready #pair-loading { display: none; }
+    footer {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 78px;
+      padding: 20px clamp(24px, 4vw, 72px);
+      border-top: 1px solid var(--line);
+      background: #0d151d;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    footer b { color: var(--paper); }
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: 32px;
+      z-index: 30;
+      padding: 11px 16px;
+      color: var(--ink);
+      background: var(--yellow);
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      transition: opacity .15s ease, transform .15s ease;
+      pointer-events: none;
+    }
+    #toast.on { opacity: 1; transform: translate(-50%, 0); }
+    #pointer-layer { position: fixed; inset: 0; z-index: 25; pointer-events: none; }
+    .remote-pointer {
+      position: absolute;
+      display: grid;
+      place-items: center;
+      width: 54px;
+      height: 54px;
+      border: 5px solid #ffffff;
+      border-radius: 50%;
+      background: var(--red);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 1000;
+      box-shadow: 5px 6px 0 #06090d99;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+    }
+    .remote-pointer.visible { opacity: 1; }
+    .remote-pointer::after {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      right: -8px;
+      bottom: -8px;
+      background: var(--yellow);
+      transform: rotate(45deg);
+    }
+    #launch {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      background: #2b7ec1;
+      opacity: 0;
+      transform: scale(.96);
+      transition: opacity .28s ease, transform .28s ease;
+    }
+    #launch.show { opacity: 1; transform: scale(1); }
+    #launch img { width: min(70vw, 760px); filter: drop-shadow(9px 11px 0 #123a5c); }
+    @keyframes enter-left { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
+    @keyframes enter-right { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 1000px) {
+      main { grid-template-columns: 1fr; width: min(760px, calc(100% - 42px)); }
+      .intro { padding-top: 12px; }
+      .content { grid-template-columns: 1fr 170px; }
+      #game-card { min-height: 0; }
+    }
+    @media (max-width: 680px) {
+      header { min-height: 72px; padding: 14px 18px; }
+      .brand small { display: none; }
+      .github-link span { display: none; }
+      #connection { padding: 8px 10px; }
+      main { width: calc(100% - 28px); padding: 34px 0; }
+      h1 { font-size: clamp(42px, 13vw, 64px); }
+      .steps { grid-template-columns:1fr; }
+      .step { min-height:auto; flex-direction:row; align-items:center; }
+      .content { grid-template-columns: 1fr; }
+      #game-card { min-height: 0; }
+      .game-art { height: 300px; min-height: 0; }
+      .pair-card { display: grid; grid-template-columns: 1fr 116px; gap: 4px 14px; align-items: center; }
+      .pair-card h2, .pair-card p { grid-column: 1; }
+      #pair-qr, #pair-loading { grid-column: 2; grid-row: 1 / 3; }
+      footer { display: none; }
+    }
+    @media (min-width: 1001px) and (max-height: 820px) {
+      header {min-height:74px;padding-top:12px;padding-bottom:12px;}
+      main {min-height:calc(100vh - 138px);padding:20px 0;}
+      h1 {font-size:clamp(42px,4.2vw,66px);}
+      .intro > p {margin:18px 0 22px;}
+      .step {min-height:88px;padding:11px;}
+      .game-art {height:300px;}
+      .game-info {padding:18px 22px;}
+      footer {min-height:64px;padding-top:14px;padding-bottom:14px;}
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop-mark"></div><div class="backdrop-line"></div>
+  <header>
+    <div class="brand"><img class="brand-mark" src="/assets/branding/gamevitto-mark.png" alt=""><span><strong>GameVitto</strong><small>CENTRAL DE JOGOS</small></span></div>
+    <div class="header-actions"><a class="github-link" href="https://github.com/vitorcgo" target="_blank" rel="noreferrer" aria-label="GitHub de VitorCGO">⌘ <span>GitHub</span></a><div id="connection" aria-live="polite"><span id="connection-dot"></span><span id="connection-text">Nenhum controle conectado</span></div></div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div class="eyebrow">Central de jogos</div>
+      <h1>Escolha. Jogue. <em>Divirta-se.</em></h1>
+      <p>Uma coleção de jogos criada por VitorCGO para transformar qualquer tela em um novo lugar para jogar.</p>
+      <div class="steps">
+        <div class="step"><b>01</b><span>Jogos autorais e experiências inspiradas em clássicos</span></div>
+        <div class="step"><b>∞</b><span>Feito para jogar sozinho ou reunir a galera</span></div>
+        <div class="step"><b>+</b><span>Novos jogos e melhorias chegando ao catálogo</span></div>
+      </div>
+    </section>
+
+    <section class="content" aria-label="Jogos disponíveis">
+      <button id="game-card" type="button" data-action="launch" disabled>
+        <div class="game-art"><span class="game-number">01</span><img id="game-logo" src="/games/mario-kart/menu-logo.svg" alt="Mario Kart"><img id="kart-card-art" src="/assets/branding/kart-card.png" alt="Kart vermelho de corrida"></div>
+        <div class="game-info">
+          <span class="available">Disponível agora</span>
+          <h2 id="game-title">Mario Kart</h2>
+          <p id="game-tagline">Carregando a corrida...</p>
+          <span class="play-label">JOGAR</span>
+        </div>
+      </button>
+      <aside class="pair-card" id="pair-card" data-action="pair">
+        <h2>Conectar celular</h2>
+        <p>Leia o código para abrir o controle.</p>
+        <div id="pair-loading">Preparando QR</div><img id="pair-qr" alt="Código QR para conectar o celular">
+      </aside>
+    </section>
+  </main>
+
+  <footer><span>Criado por <a href="https://github.com/vitorcgo" target="_blank" rel="noreferrer"><b>VitorCGO</b></a></span><span><b>CONTROLES</b> A ou Enter inicia, C ou R recentraliza</span></footer>
+  <div id="toast" role="status"></div><div id="pointer-layer"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="menu.js"></script>
+</body>
+</html>

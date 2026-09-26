@@ -1,0 +1,10 @@
+/** Staged visual inspection of the optional measured source course. */
+import {chromium} from 'playwright';import {mkdir,writeFile} from 'node:fs/promises';import assert from 'node:assert/strict';
+const out=process.env.EVIDENCE_DIR||'games/mario-kart/evidence/overnight/36-source-course';await mkdir(out,{recursive:true});
+const browser=await chromium.launch({channel:'chrome',headless:true});const report={kind:'Staged source-course gameplay rendering',errors:[],poses:[]};
+try{const page=await browser.newPage({viewport:{width:1440,height:900}});page.on('pageerror',e=>report.errors.push(e.message));page.on('console',m=>{if(['error','warning'].includes(m.type())&&/THREE\.|WebGL|FRAMEBUFFER|feedback loop|GL_INVALID/.test(m.text()))report.errors.push(m.text())});
+await page.goto('http://localhost:8080/games/mario-kart/?evidence=1');await page.waitForFunction(()=>window.__kart?.assets?.loaded===8,{},{timeout:120000});assert.equal(await page.evaluate(()=>__kart.sourceCourse),true);await page.keyboard.press('KeyC');await page.keyboard.press('Enter');await page.waitForFunction(()=>__kart.race.state==='racing'&&__kart.race.time>4);await page.evaluate(()=>{__kart.freeze=true;});
+for(const [name,s] of [['grid',0],['underpass',75],['bend',150],['hairpin',235],['return',330],['climb',425],['bank',550],['bank-high',650],['summit',720],['crest',800],['launch',875],['glider',935],['landing',1020],['finish',1130]]){
+ await page.evaluate(({name,s})=>{__kart.place(s);const r=__kart.race.player;r.gliding=name==='glider';if(r.gliding)r.y+=8;r.drift=0;r.spin=0;}, {name,s});const frame=await page.evaluate(()=>__kart.renderCount);await page.waitForFunction(n=>__kart.renderCount>n+3,frame);await page.screenshot({path:`${out}/${name}.png`});report.poses.push(await page.evaluate(name=>({name,player:{...__kart.race.player},camera:__kart.cameraState,stats:__kart.stats}),name));}
+await writeFile(`${out}/source-staging.json`,JSON.stringify(report,null,2));assert.deepEqual(report.errors,[]);console.log(`PASS ${report.poses.length} source-course poses`);
+}finally{await browser.close()}

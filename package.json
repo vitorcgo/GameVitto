@@ -1,0 +1,36 @@
+{
+  "name": "gamevitto",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GameVitto — central de jogos para navegador criada por VitorCGO.",
+  "author": {
+    "name": "VitorCGO",
+    "url": "https://github.com/vitorcgo"
+  },
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "tv": "open -na 'Google Chrome' --args --user-data-dir=$HOME/.gamevitto-chrome --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --new-window https://localhost:8443/",
+    "dev": "node --watch server.js",
+    "cert": "node scripts/gen-cert.js",
+    "test": "node tests/kart-prototype/server.cjs",
+    "build:kart-assets": "node games/mario-kart/pipeline/build.mjs",
+    "test:kart-browser": "node games/mario-kart/browser-evidence.mjs",
+    "test:kart-public": "node games/mario-kart/public-review.mjs",
+    "test:unit": "node --test \"core/**/*.test.mjs\" \"games/**/*.test.mjs\" \"tests/**/*.test.mjs\""
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "three": "^0.185.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

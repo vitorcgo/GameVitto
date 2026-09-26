@@ -1,0 +1,22 @@
+node_modules/
+certs/
+.DS_Store
+npm-debug.log*
+
+# Optional audio overrides — never ship copyrighted audio.
+audio/
+
+# Local generated model pack and browser evidence.
+/assets/
+/games/mario-kart/evidence/
+
+# Local environment configuration and credentials.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.key
+*.pem
+*.p12
+*.pfx

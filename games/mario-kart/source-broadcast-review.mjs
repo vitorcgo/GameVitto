@@ -1,0 +1,22 @@
+/** Measure shape on the actual source panel, independent of the feed's configured aspect. */
+import {chromium} from 'playwright';import {mkdir,writeFile} from 'node:fs/promises';import assert from 'node:assert/strict';
+const out=process.env.EVIDENCE_DIR;assert.ok(out);await mkdir(out,{recursive:true});const b=await chromium.launch({channel:'chrome',headless:true}),report={method:'Render a geometric white circle through stadiumBroadcast onto the actual source TV geometry; measure its final pixel silhouette. Also inspect live-game texture dimensions.',errors:[]};
+try{const p=await b.newPage({viewport:{width:1200,height:800}});p.on('pageerror',e=>report.errors.push(e.message));await p.goto('http://localhost:8080/games/mario-kart/pipeline/stadium-review.html');await p.waitForFunction(()=>window.sourceStadiumReview);
+report.calibration=await p.evaluate(async()=>{
+ const {THREE:T,renderer,course}=sourceStadiumReview,{stadiumBroadcast}=await import('../stadium-broadcast.js'),{orientSourceScreen}=await import('../source-screens.js');let source;course.traverse(o=>{if(o.isMesh&&o.material.name==='fc_TV_capture')source=o;});source.updateWorldMatrix(true,false);
+ const g=source.geometry.clone().applyMatrix4(source.matrixWorld),a=g.attributes.position,uv=g.attributes.uv,vertices=Array.from({length:4},(_,i)=>({p:new T.Vector3().fromBufferAttribute(a,i),u:uv.getX(i)})).sort((a,b)=>b.p.y-a.p.y),top=vertices.slice(0,2).sort((a,b)=>a.u-b.u),bottom=vertices.slice(2).sort((a,b)=>a.u-b.u);
+ const width=top[0].p.distanceTo(top[1].p),height=top[0].p.distanceTo(bottom[0].p),center=vertices.reduce((sum,v)=>sum.add(v.p),new T.Vector3()).multiplyScalar(.25),right=top[1].p.clone().sub(top[0].p).normalize(),up=top[0].p.clone().sub(bottom[0].p).normalize(),normal=new T.Vector3().crossVectors(right,up).normalize();
+ const material=new T.MeshBasicMaterial({name:'fc_TV_capture',side:T.DoubleSide}),panel=new T.Mesh(g,material);orientSourceScreen(panel);
+ const feedScene=new T.Scene();feedScene.background=new T.Color('#102050');feedScene.add(new T.Mesh(new T.CircleGeometry(1.7,96),new T.MeshBasicMaterial({color:'white'})));
+ const chase=new T.PerspectiveCamera(58,1,.1,100);chase.position.z=10;chase.lookAt(0,0,0);
+ const broadcast=stadiumBroadcast(renderer,feedScene,[material],{width:768,height:432});broadcast.update(1,chase);
+ const scene=new T.Scene();scene.background=new T.Color('#050509');scene.add(panel);
+ const camera=new T.OrthographicCamera(-width*.6,width*.6,width*.4,-width*.4,.1,100);camera.position.copy(center).addScaledVector(normal,30);camera.up.copy(up);camera.lookAt(center);
+ renderer.toneMapping=T.NoToneMapping;const target=new T.WebGLRenderTarget(1200,800);renderer.setRenderTarget(target);renderer.render(scene,camera);const bytes=new Uint8Array(1200*800*4);renderer.readRenderTargetPixels(target,0,0,1200,800,bytes);let minX=1200,maxX=-1,minY=800,maxY=-1;
+ for(let y=0;y<800;y++)for(let x=0;x<1200;x++){const i=(y*1200+x)*4;if(bytes[i]>220&&bytes[i+1]>220&&bytes[i+2]>220){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}}
+ renderer.setRenderTarget(null);renderer.render(scene,camera);return {panelWidth:width,panelHeight:height,panelAspect:width/height,feedWidth:material.map.image.width,feedHeight:material.map.image.height,circleWidth:maxX-minX+1,circleHeight:maxY-minY+1,circleAspect:(maxX-minX+1)/(maxY-minY+1)};
+});await p.screenshot({path:out+'/circle-on-source-panel.png'});
+await p.goto('http://localhost:8080/games/mario-kart/?evidence=1'+(process.env.GENERATED==='1'?'&sourceCourse=0':''));await p.waitForFunction(()=>window.__kart?.assets?.loaded===8);report.live=await p.evaluate(()=>{const result=[];__kart.karts[0].root.parent.traverse(o=>{if(o.isMesh&&o.material?.map?.isRenderTargetTexture){const t=o.material.map;result.push({name:o.name,width:t.image.width,height:t.image.height});}});return result;});
+report.expectedLiveAspect=process.env.GENERATED==='1'?4/3:report.calibration.panelAspect;
+report.pass=Math.abs(report.calibration.circleAspect-1)<.015&&report.live.length>0&&report.live.every(r=>Math.abs(r.width/r.height-report.expectedLiveAspect)<.001);assert.deepEqual(report.errors,[]);if(process.env.EXPECT_FIXED==='1')assert.ok(report.pass,JSON.stringify(report));console.log(report.calibration,report.live,report.pass);
+}finally{await writeFile(out+'/broadcast-review.json',JSON.stringify(report,null,2));await b.close();}
